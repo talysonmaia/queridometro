@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Queridômetro – Rancho do Maia</title>
+<style>
+:root{--bg:#fff7f0;--card:#ffffff;--ink:#2a1b1b;--mute:#7a6a68;--line:#f0dcd2;--acc:#e5484d;--acc2:#ffe3e1;--ok:#2f9e6b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1214;--card:#261b1e;--ink:#f6eceb;--mute:#b49c9a;--line:#3a2a2e;--acc:#ff6b70;--acc2:#4a2428;--ok:#4cc38a}}
+:root[data-theme="dark"]{--bg:#1a1214;--card:#261b1e;--ink:#f6eceb;--mute:#b49c9a;--line:#3a2a2e;--acc:#ff6b70;--acc2:#4a2428;--ok:#4cc38a}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.4}
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:26px;margin:4px 0 2px}
+.sub{color:var(--mute);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:10px 14px}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
+.names{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.names button{text-align:left}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.emo{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.emo button{font-size:22px;padding:6px 10px;border-radius:12px;line-height:1}
+.emo button.on{background:var(--acc2);border-color:var(--acc);transform:scale(1.08)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--mute);margin:8px 0}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:6px 0 14px}
+.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s}
+textarea{width:100%;min-height:130px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px;font:14px ui-monospace,Menlo,monospace}
+.code{font:600 15px ui-monospace,Menlo,monospace;word-break:break-all;background:var(--acc2);padding:12px;border-radius:12px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+.rank{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.rank b{width:28px;text-align:center;font-size:20px}
+.rank span.s{margin-left:auto;font-weight:700}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button.on{background:var(--acc2);border-color:var(--acc)}
+.muted{color:var(--mute);font-size:14px}
+a{color:var(--acc)}
+.names button.on{background:var(--acc2);border-color:var(--acc);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💘 Queridômetro</h1>
+  <p class="sub">Rancho do Maia – Itamaracá</p>
+  <div class="tabs">
+    <button id="t1" class="on" onclick="tab(1)">Votar</button>
+    <button id="t2" onclick="tab(2)">Apuração</button>
+  </div>
+  <div id="app"></div>
+</div>
+<script>
+const NAMES=["Anderson Braz","Anderson Catarina","Assíria","Catarina","Clara","Davi","Diego","Edu","Guilherme","Iasmin","Igor","Marcão","Rhuan","Talys","Vitória"];
+const EM=["❤️","🌱","🍌","🐍","🤥","💣"];
+const LBL=["Querido(a)","Planta","Banana","Cobra","Mentiroso(a)","Bomba"];
+const PTS=[1,0,-1,-1,-1,-1];
+const ID="0123456789abcde";
+let me=null,picks={},angel=null,mons=[],view="vote",code="";
+const $=s=>document.querySelector(s);
+const legend='<div class="legend">'+EM.map((e,i)=>`<span>${e} ${LBL[i]}</span>`).join("")+'</div>';
+function sKey(){return "qm2_"+me}
+function save(){try{localStorage.setItem(sKey(),JSON.stringify({p:picks,a:angel,m:mons}))}catch(e){}}
+function load(){picks={};angel=null;mons=[];try{const o=JSON.parse(localStorage.getItem(sKey()));if(o){picks=o.p||{};angel=NAMES.includes(o.a)?o.a:null;mons=(o.m||[]).filter(x=>NAMES.includes(x)).slice(0,2)}}catch(e){}}
+function tab(n){view=n==1?"vote":"count";$("#t1").className=n==1?"on":"";$("#t2").className=n==2?"on":"";render()}
+function login(i){me=NAMES[i];load();code="";render()}
+function logout(){me=null;code="";render()}
+function pick(t,i){if(picks[t]===i)delete picks[t];else picks[t]=i;save();render(true)}
+function setAngel(n){angel=angel===n?null:n;save();render(true)}
+function toggleMon(n){const i=mons.indexOf(n);if(i>=0)mons.splice(i,1);else{if(mons.length>=2)mons.shift();mons.push(n)}save();render(true)}
+function others(){return NAMES.filter(n=>n!==me)}
+function makeCode(){
+  const idx=NAMES.indexOf(me);
+  const a=angel?ID[NAMES.indexOf(angel)]:"-";
+  const ms=mons.map(n=>ID[NAMES.indexOf(n)]).sort();while(ms.length<2)ms.push("-");
+  code="QM-"+String(idx).padStart(2,"0")+"-"+NAMES.map(n=>n===me?"x":(picks[n]!==undefined?picks[n]:"-")).join("")+"-"+a+"-"+ms.join("");
+  render();
+}
+function copy(txt){
+  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(()=>alert("Copiado!"),()=>prompt("Copie:",txt))}else prompt("Copie:",txt)
+}
+function renderVote(keep){
+  const y=window.scrollY;
+  const a=$("#app");
+  if(!me){
+    a.innerHTML=`<div class="card"><b>Quem é você?</b><p class="muted">Escolha seu nome para abrir o seu queridômetro.</p><div class="names">${NAMES.map((n,i)=>`<button onclick="login(${i})">${n}</button>`).join("")}</div></div>`;
+    return;
+  }
+  const done=others().filter(n=>picks[n]!==undefined).length;
+  let h=`<div class="row"><b>Queridômetro de ${me}</b><button onclick="logout()">Trocar usuário</button></div>
+  <p class="muted">Dê um emoji para cada amigo. Toque de novo para remover.</p>${legend}
+  <div class="bar"><i style="width:${done/14*100}%"></i></div>`;
+  h+=others().map(n=>`<div class="card"><b>${n}</b><div class="emo">${EM.map((e,i)=>`<button class="${picks[n]===i?"on":""}" title="${LBL[i]}" onclick="pick('${n}',${i})">${e}</button>`).join("")}</div></div>`).join("");
+  h+=`<div class="card"><b>😇 Anjo</b><p class="muted">Escolha 1 pessoa. Quem for o Anjo ganha imunidade do paredão.</p><div class="names">${others().map(n=>`<button class="${angel===n?"on":""}" onclick="setAngel('${n}')">${n}</button>`).join("")}</div></div>`;
+  h+=`<div class="card"><b>👹 Monstros</b><p class="muted">Escolha 2 pessoas. Os Monstros pagam uma prenda ou desafio. (${mons.length}/2)</p><div class="names">${others().map(n=>`<button class="${mons.includes(n)?"on":""}" onclick="toggleMon('${n}')">${n}</button>`).join("")}</div></div>`;
+  h+=`<div class="card"><div class="row"><span>${done}/14 emojis · Anjo ${angel?"✔":"—"} · Monstros ${mons.length}/2</span><button class="pri" onclick="makeCode()">Finalizar e gerar meu código</button></div>`;
+  if(code){
+    const wa="https://wa.me/?text="+encodeURIComponent(code);
+    h+=`<p class="muted">Envie este código para quem vai apurar (Talys):</p><div class="code">${code}</div>
+    <div class="row" style="margin-top:10px"><button onclick="copy('${code}')">Copiar</button><a href="${wa}" target="_blank" rel="noopener"><button>Enviar no WhatsApp</button></a></div>
+    <p class="muted">Pode mudar seus votos e gerar um novo código; vale o último.</p>`;
+  }
+  h+="</div>";
+  a.innerHTML=h;
+  if(keep)window.scrollTo(0,y);
+}
+let revealed=false;
+function renderCount(){
+  const a=$("#app");
+  a.innerHTML=`<div class="card"><b>Apuração</b><p class="muted">Cole aqui os códigos de todo mundo (um por linha ou tudo junto).</p>
+  <textarea id="codes" placeholder="QM-00-x3--1...-5-0a" oninput="revealed=false;calc()"></textarea><div id="out"></div></div>`;
+  calc();
+}
+function parse(txt){
+  const m=new Map(),re=/QM-(\d\d)-([0-5x-]{15})(?:-([0-9a-e-])-([0-9a-e-]{2}))?/g;let r;
+  while((r=re.exec(txt))){const v=+r[1];if(v<15&&r[2][v]==="x")m.set(v,{s:r[2],a:r[3]||"-",m:r[4]||"--"})}
+  return m;
+}
+function calc(){
+  const ta=$("#codes");const out=$("#out");if(!ta)return;
+  const m=parse(ta.value);
+  const n=m.size;
+  const miss=NAMES.filter((_,i)=>!m.has(i));
+  let h=`<p><b>${n}/15</b> votaram.${miss.length&&n?` Faltam: ${miss.join(", ")}.`:""}</p>`;
+  if(!n){out.innerHTML=h;return}
+  if(!revealed){out.innerHTML=h+`<button class="pri" onclick="revealed=true;calc()">🥁 Revelar resultados</button>`;return}
+  const res=NAMES.map((nm,t)=>{
+    const c=[0,0,0,0,0,0];let an=0,mo=0;
+    m.forEach((v,vi)=>{
+      if(vi===t)return;
+      const ch=v.s[t];if(ch!=="x"&&ch!=="-")c[+ch]++;
+      if(v.a===ID[t])an++;
+      if(v.m[0]===ID[t])mo++;
+      if(v.m[1]===ID[t]&&v.m[1]!==v.m[0])mo++;
+    });
+    return{nm,c,an,mo,sc:c.reduce((a,x,i)=>a+x*PTS[i],0)};
+  });
+  // Anjo
+  const aMax=Math.max(...res.map(r=>r.an));
+  const aw=aMax?res.filter(r=>r.an===aMax):[];
+  let ah;
+  if(!aw.length)ah="Ninguém votou no Anjo.";
+  else if(aw.length===1)ah=`<b>${aw[0].nm}</b> (${aMax} voto${aMax>1?"s":""}) — imune ao paredão! 🛡️`;
+  else ah=`Empate entre <b>${aw.map(r=>r.nm).join(", ")}</b> (${aMax} votos cada). Desempate no par ou ímpar/sorteio. 🎲`;
+  // Monstros (o Anjo é imune)
+  const imune=aw.length===1?aw[0].nm:null;
+  const pool=res.filter(r=>r.mo>0&&r.nm!==imune).sort((a,b)=>b.mo-a.mo||a.nm.localeCompare(b.nm,"pt"));
+  let mh;
+  if(!pool.length)mh="Ninguém votou nos Monstros.";
+  else if(pool.length<=2)mh=pool.map(r=>`<b>${r.nm}</b> (${r.mo})`).join(" e ");
+  else{
+    const cut=pool[1].mo,sure=pool.filter(r=>r.mo>cut),tied=pool.filter(r=>r.mo===cut),need=2-sure.length;
+    if(tied.length>need)mh=(sure.length?sure.map(r=>`<b>${r.nm}</b> (${r.mo})`).join(" e ")+" e ":"")+`mais ${need} entre <b>${tied.map(r=>r.nm).join(", ")}</b> (${cut} cada) — desempate por sorteio 🎲`;
+    else mh=sure.concat(tied).map(r=>`<b>${r.nm}</b> (${r.mo})`).join(" e ");
+  }
+  h+=`<h3>Anjo e Monstros</h3><div class="card" style="margin:0"><div>😇 <b>Anjo:</b> ${ah}</div><div style="margin-top:8px">👹 <b>Monstros:</b> ${mh}${pool.length?"<br><span class=\"muted\">Pagam uma prenda ou desafio!</span>":""}</div>${imune&&res.find(r=>r.nm===imune).mo?`<div class="muted" style="margin-top:8px">${imune} também recebeu votos de Monstro, mas está imune por ser o Anjo.</div>`:""}</div>`;
+  const rk=[...res].sort((a,b)=>b.sc-a.sc||a.nm.localeCompare(b.nm,"pt"));
+  const med=["🥇","🥈","🥉"];
+  h+=`<h3>Ranking do Queridômetro</h3><p class="muted">Pontos: ❤️ +1 · 🌱 0 · 🍌🐍🤥💣 −1</p>`+rk.map((r,i)=>`<div class="rank"><b>${med[i]||i+1}</b><span>${r.nm}</span><span class="s">${r.sc>0?"+":""}${r.sc}</span></div>`).join("");
+  const top=(k)=>{const mx=Math.max(...res.map(r=>r.c[k]));return mx?res.filter(r=>r.c[k]===mx).map(r=>r.nm).join(", ")+` (${mx})`:"ninguém"};
+  h+=`<h3>Destaques</h3><div class="card" style="margin:0">${[0,2,3,4,5].map(k=>`<div>${EM[k]} <b>${LBL[k]}</b>: ${top(k)}</div>`).join("")}</div>`;
+  h+=`<h3>Tabela completa (ordem alfabética)</h3><div class="scroll"><table><tr><th>Nome</th>${EM.map(e=>`<th>${e}</th>`).join("")}<th>😇</th><th>👹</th><th>Pts</th></tr>${res.map(r=>`<tr><td>${r.nm}</td>${r.c.map(x=>`<td>${x}</td>`).join("")}<td>${r.an}</td><td>${r.mo}</td><td><b>${r.sc}</b></td></tr>`).join("")}</table></div>`;
+  out.innerHTML=h;
+}
+function render(keep){view==="vote"?renderVote(keep):renderCount()}
+render();
+</script>
+</body>
+</html>
